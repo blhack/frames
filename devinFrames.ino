@@ -1,28 +1,43 @@
-#include <Adafruit_NeoPixel.h>
-/*LEDS are connected to the 5V pin on the arduino, which has a max rated [nominal] current of 500ma.
- * Each pixel draws a maximum of 60ma, thus THERE SHOULD NEVER BE MORE THAN 9 PIXELS AT FULL BRIGHTNESS
- * USE THE blackOut() function liberally!
- * 
-  */
+#include "FastLED.h"
 
 #define PIN 6
 #define NUM_LEDS 180
+#define NUM_FRAMES 30
 
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, PIN, NEO_GRB + NEO_KHZ800);
+short frameIndex = 1;           //what frame is currently being displayed
+unsigned long frameExpiration = 0;   //when shoudl that frame expire (triggering the next one)
+unsigned long fadeExpiration = 0;
 
-short framePixels[18] = {255, 0, 0,
-                        255, 255, 0,
-                        0, 0, 255,
-                        0, 255, 0,
-                        255, 0, 0,
-                        0, 255, 0};
+short chaseDelay = 100;         //how many MS should each from be visible for
+short fadeDelay = 1;
+
+CRGB leds[NUM_LEDS];
+
+struct pixel {
+  short R;
+  short G;
+  short B;
+};
+
+pixel framePixels[6] = {{0, 0, 255},
+                        {0, 0, 255},
+                        {0, 0, 255},
+                        {0, 0, 255},
+                        {0, 0, 255},
+                        {0, 0, 255}};
+
+pixel target[6] = {{0, 0, 255},
+                   {0, 0, 255},
+                   {0, 0, 255},
+                   {0, 0, 255},
+                   {0, 0, 255},
+                   {0, 0, 255}};
 
 
 void blackOut() {
   for (int i=0; i<NUM_LEDS; i++) {
-    strip.setPixelColor(i, 0,0,0);
+    setPixel(i, 0,0,0);
   }
-  strip.show();
 }
 
 void frame(int index) {
@@ -30,36 +45,91 @@ void frame(int index) {
   
   short pixelIndex = 0; 
   short pixelStart = 0;
+  
   for (int i=index-1; i<180; i+=60) {
     pixelStart = pixelIndex * 3;
-    strip.setPixelColor(i, framePixels[pixelStart],framePixels[pixelStart+1],framePixels[pixelStart+2]);
+    setPixel(i, framePixels[pixelIndex].R,framePixels[pixelIndex].G,framePixels[pixelIndex].B);
     pixelIndex+=2;
   }
   pixelIndex = 1;
   for (int i=60-index; i<180; i+=60){
     pixelStart = pixelIndex * 3;
-    strip.setPixelColor(i, framePixels[pixelStart],framePixels[pixelStart+1],framePixels[pixelStart+2]);
+    setPixel(i, framePixels[pixelIndex].R,framePixels[pixelIndex].G,framePixels[pixelIndex].B);
     pixelIndex+=2;
   }
-  strip.show();
+}
+
+void setPixel(int index, int r, int g, int b) {
+  leds[index].r = r;
+  leds[index].g = g;
+  leds[index].b = b;
+}
+
+void expireFrames() {
+  if (millis() > frameExpiration) {
+    frameIndex++;
+    if (frameIndex > 30) {
+      frameIndex = 1;
+    }
+    frameExpiration = millis() + chaseDelay;
+  }
+}
+
+void expireFade() {
+  if (millis() > fadeExpiration) {
+    fadeChase();
+    fadeExpiration = millis() + fadeDelay;
+  }
 }
 
 void generateFrame() {
-  //modify the global framePixels in here.
+  if (framePixels[1].R == target[1].R) {
+    target[0] = {random(0,255),random(0,129),random(0,128)};
+    target[1] = {random(0,255),random(0,129),random(0,128)};
+    target[2] = {random(0,255),random(0,129),random(0,128)};
+    target[3] = {random(0,255),random(0,129),random(0,128)};
+    target[4] = {random(0,255),random(0,129),random(0,128)};
+    target[5] = {random(0,255),random(0,129),random(0,128)};
+  }
+}
+
+void fadeChase() {
+  for (int i=0; i<6; i++) {
+    if (framePixels[i].R > target[i].R) {
+      framePixels[i].R = framePixels[i].R - 1;
+    }
+
+    if (framePixels[i].R < target[i].R) {
+      framePixels[i].R = framePixels[i].R + 1;
+    }
+
+    if (framePixels[i].G > target[i].G) {
+      framePixels[i].G = framePixels[i].G - 1;
+    }
+
+    if (framePixels[i].G < target[i].G) {
+      framePixels[i].G = framePixels[i].G + 1;
+    }
+
+    if (framePixels[i].B > target[i].B) {
+      framePixels[i].B = framePixels[i].B - 1;
+    }
+
+    if (framePixels[i].B < target[i].B) {
+      framePixels[i].B = framePixels[i].B + 1;
+    }  
+  }
 }
 
 void setup() {
-  strip.begin();
+  FastLED.addLeds<NEOPIXEL, PIN, GRB>(leds, NUM_LEDS);
   Serial.begin(9600);
 }
 
 void loop() {
-
-  generateFrame();
-  
-  for (int i=1; i<30; i++) {
-    frame(i);
-    delay(10);
-  }
-  delay(1);
+  //generateFrame();
+  expireFrames();
+  //expireFade();
+  frame(frameIndex);
+  FastLED.show();
 }
