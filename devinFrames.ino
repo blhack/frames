@@ -1,43 +1,38 @@
 #include "FastLED.h"
+#include "frameDefs.h"
 
 #define PIN 6
 #define NUM_LEDS 180
 #define NUM_FRAMES 30
+#define TRIGPIN 8
+#define ECHOPIN 9
 
 short frameIndex = 1;           //what frame is currently being displayed
 unsigned long frameExpiration = 0;   //when shoudl that frame expire (triggering the next one)
 unsigned long fadeExpiration = 0;
 
-short chaseDelay = 100;         //how many MS should each from be visible for
+short chaseDelay = 50;         //how many MS should each from be visible for
 short fadeDelay = 1;
 
 CRGB leds[NUM_LEDS];
-
-struct pixel {
-  short R;
-  short G;
-  short B;
-};
-
-pixel framePixels[6] = {{0, 0, 255},
-                        {0, 0, 255},
-                        {0, 0, 255},
-                        {0, 0, 255},
-                        {0, 0, 255},
-                        {0, 0, 255}};
-
-pixel target[6] = {{0, 0, 255},
-                   {0, 0, 255},
-                   {0, 0, 255},
-                   {0, 0, 255},
-                   {0, 0, 255},
-                   {0, 0, 255}};
-
 
 void blackOut() {
   for (int i=0; i<NUM_LEDS; i++) {
     setPixel(i, 0,0,0);
   }
+}
+
+int getDistance() {
+  long duration, distance;
+  digitalWrite(TRIGPIN, LOW);  // Added this line
+  delayMicroseconds(2); // Added this line
+  digitalWrite(TRIGPIN, HIGH);
+  delayMicroseconds(10); // Added this line
+  digitalWrite(TRIGPIN, LOW);
+  duration = pulseIn(ECHOPIN, HIGH);
+  Serial.println(duration);
+  distance = (duration/2) / 29.1;
+  return(distance);
 }
 
 void frame(int index) {
@@ -131,5 +126,7 @@ void loop() {
   expireFrames();
   //expireFade();
   frame(frameIndex);
+  int distance = getDistance();
   FastLED.show();
+  delay(10);
 }
